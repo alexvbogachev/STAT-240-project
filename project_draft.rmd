@@ -1,0 +1,353 @@
+---
+title: "project draft"
+author: "Alex Bogachev, Imran Bin Iskander Gani, Mustafa Eltgani"
+date: "2024-04-17"
+output: rmdformats::readthedown
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include= FALSE}
+library(tidyverse)
+library(kableExtra)
+library(modelr)
+source("../scripts/ggprob.R")
+options(warn = -1)
+
+# Function
+cor_plot = function(x,y)
+{
+  ggplot(tibble(x,y), aes(x=x, y=y)) +
+    geom_point() +
+    geom_smooth(se = FALSE, method = "lm") +
+    geom_vline(xintercept = mean(x), color = "red", linetype = "dashed") +
+    geom_hline(yintercept = mean(y), color = "red", linetype = "dashed") +
+    ggtitle(str_c("r ≈ ", round(cor(x,y),2))) +
+  theme_bw() +
+  theme(text = element_text(size = 20)) 
+}
+
+# Reading the data
+car <- read.csv("used_cars_data.csv") %>% 
+  rename(price = price..eur.,
+         mileage_km = mileage..kms.)
+
+# adding mileage cutoff
+car<- car %>% 
+  mutate(mileage_category = 
+           case_when(mileage_km>=100000 ~ "High mileage",
+                     mileage_km<100000 ~ "Low mileage")) 
+```
+
+# Introduction
+
+## Motivation
+
+  As the automotive industry evolves, understanding the dynamics of car pricing becomes increasingly pivotal. In our analysis, we delve into the intriguing relationship between mileage and car prices, seeking not only to discern differences between high and low mileage vehicles but also to construct a predictive model that illuminates the future trajectory of car pricing trends. 
+
+## Questions of Interest
+  
+  Our project seeks to answer two questions about used car prices. First, are the mean prices for cars with high mileage(100000 km =>) equal or different from the mean prices for cars with low mileage (<100000 km)? Second, how can we predict car prices based on their mileage using regression?
+
+## Thesis Statement
+
+  Our study asserts that mileage significantly influences used car prices, as evidenced by our analysis of data sourced from a reputable car sharing and selling platform. Through statistical inference and regression modeling, we aim to proof that there is disparities in mean prices between high and low mileage vehicles. Furthermore, we also want to be able to predict car prices based on mileage.
+  
+# Background 
+
+## Dataset description
+
+* The data was collected by `Simona Cana Ungureanu` and `Alba Aguilar Vialata` from https://www.flexicar.es/, a car sharing company which also sells and buys used car.
+
+* They obtain the data by web-scraping it from the website.
+
+* The data was posted here ^[Ungureanu, S. C., & Vilalta, A. A. (2022, April 11). Second-hand car market state in Barcelona (2022). Zenodo. https://zenodo.org/records/6438518 ]
+
+* The data have 790 rows and 10 columns.
+
+* Key variable in the data are the brand, model, price, mileage, fuel type, gearbox, engine, year and location.
+
+### Variable description
+
+**Key Variables:**
+
+- **Brand, Model, Engine, Year**: These variables identify each car's specifications and market segment.
+
+- **Price**: The primary variable of interest, influenced by car features and market dynamics, used in our regression analysis and group comparisons.
+
+- **Mileage**: Essential for grouping cars into 'high' or 'low' mileage categories for pricing analysis.
+
+- **Fuel Type, Gearbox**: Additional variables considered for detailed analysis.
+
+
+## Background information about this project
+
+  In the context this project, understanding several terms could be useful for the comprehending the reason behind this analysis. Firstly, car mileage, often indicated by an odometer reading, denotes the total distance a vehicle has traveled since its manufacture or its last odometer reset. This metric serves as a crucial indicator of a car's wear and tear, influencing its overall value. Secondly, car price represents the monetary worth of a vehicle, determined by various factors such as its brand, model, year of manufacture, condition, features, and notably, its mileage. The mean price for cars with high mileage and those with low mileage serves as a focal point of analysis. This comparison aims to discern whether there is a significant difference in the average prices of vehicles that have traveled considerable distances versus those with relatively minimal mileage, shedding light on the impact of mileage on pricing dynamics. Usually, car with higher mileage is deemed undesirable in the used car market as it indicate that it has been used extensively by the precious owner. We are going to see here if that will affect the pricing of the car.
+  
+## Unusual factors
+
+* It is worth noting that the unit for the mileage here is in Kilometers and the unit of the price here is in Euros (European currency)
+  
+  
+## The flow of the project
+
+* We are planning to use variable mileage to categorize the car into high mileage car and low mileage car then compare the mean using statistical inference. We will use one cut off point = 100000km, taken from ^[How many kilometers is too much for a used car?. Tabangi Motors Kitchener. (2024, February 8). https://kitchener.tabangimotors.com/blog/how-many-kilometers-is-too-much-for-a-used-car/#:~:text=High%20mileage%20varies%20depending%20on,also%20play%20a%20significant%20role. ] mileage to categorize high mileage car and low mileage car. We intend to use difference in means model here.
+
+* Next, we also want to see if we are able to predict car prices based on the car mileage. We intend to use linear regression.
+
+
+# Analysis
+
+* Our analysis is split into two parts, first looking at the `difference in mean price for car with high mileage and low mileage` and the second part is to `prediction of price from mileage`.
+
+## Part 1 [Difference in mean]
+
+* Here, we used the cutoff points of 100000 km for the high mileage cars. This decision is based on one article on how to categorized high mileage cars. The link to the article is in the reference section.
+
+**First, lets look at how many cars are categorized into high mileage and low mileage.**
+
+```{r, echo=FALSE}
+# Include numerical and graphical summaries of the data. Be sure to introduce and describe your numerical and graphical summaries.  Do not display a series of summaries without text explaining them.
+
+car %>% 
+  count(mileage_category) %>% 
+  ggplot(aes(mileage_category,n))+
+  geom_col(aes(fill = mileage_category ), color = "black")+
+  scale_fill_viridis_d()+
+  theme_minimal()+
+  labs(x = "Mileage category", 
+       y = "Count", 
+       title = "Number of car by mileage category in the dataset",
+       fill = "Category")
+  
+
+```
+
+* Here we can see that the number of low mileage car is bigger in our data set. It is almost twice the amount of high mileage car.
+
+**Next, lets look at the price variation in these two group.**
+
+```{r, echo=FALSE, warning=FALSE}
+
+car %>% 
+  ggplot(aes(mileage_km,price))+
+  geom_point(aes(color = mileage_category))+
+  geom_smooth(se = FALSE, method = "lm")+
+  facet_wrap(~mileage_category,scales = "free")+
+  scale_color_viridis_d()+
+  theme_minimal()+
+  labs(y = "Price", 
+       x = "Mileage in Kilometres", 
+       color = "Category",
+       title = "Scatterplot of price and mileage for both category of cars" )
+
+```
+
+* There is not much variation in price both high mileage and low mileage car. We will need to investigate more if the mean price for high mileage car is different from mean price for low mileage car.
+
+* Also, the price variation roughly looks the same here.
+
+**Inference on difference in means**
+
+* The method we decided to use here is the hypothesis testing for the difference in two means
+
+* Our **inference question** is:
+
+> Is there a difference between the true underlying average price of high mileage car and low mileage car?
+
+
+### Step 1: Model Statement
+
+* Let $X_i$, for $i = 1, ... n_1$ be the observed price of the high mileage cars.
+* Let $Y_i$, for $i = 1, ... n_2$ be the observed price of the low mileage cars.
+
+* Let $\mu_x$ and $\sigma_x$ be the true average and standard deviation of the true distribution $D_x$ of the high mileage cars.
+* Let $\mu_y$ and $\sigma_y$ be the true average and standard deviation of the true distribution $D_y$ of the low mileage cars.
+
+$$
+X_i \sim D_x(\mu_x, \sigma_x) \\
+Y_i \sim D_y(\mu_y, \sigma_y)
+$$
+
+### Step 2: State Hypotheses
+
+* Our **parameter of interest** is $\mu_x - \mu_y$.
+
+* The null hypothesis captures the idea that there is no pattern/total randomness/no difference.
+
+$$
+H_0: \mu_x = \mu_y \\
+\text{or, equivalently: } H_0: \mu_x-\mu_y = 0 
+$$
+
+* The alternative hypothesis captures the idea that there is a pattern/some systematic relationship/a difference.
+
+* We decided to use one sided alternative hypothesis since we expect high mileage car to have lower price therefore making the difference less than 0.
+
+$$
+H_a: \mu_x < \mu_y \\
+\text{or, equivalently: } H_0: \mu_x-\mu_y < 0 
+$$
+
+### Step 3: Test Statistic and Null Distribution
+
+* We use the unequal variances standard error and approximate degrees of freedom.
+
+$$
+\frac{(\bar{x} - \bar{y}) - (\mu_x - \mu_y)}{SE(\bar{x} - \bar{y})} \text{ under } H_0 = \frac{(\bar{x} - \bar{y}) - (0)}{\sqrt{\frac{s_x^2}{n_x} + \frac{s_y^2}{n_y}}} \sim t(W)
+$$
+
+$$
+W =\frac{(s_x^2/n_x\,+\,s_y^2/n_y)^2}{(s_x^2/n_x)^2/(n_x-1)\,+\,(s_y^2/n_y)^2/(n_y-1)}
+$$
+
+### Step 4: Identify Relevant Outcomes from Data and Alt. Hyp.
+
+* This is the important values and the test statistics:
+
+```{r, echo=FALSE}
+
+car_twomeans_summary = car %>% 
+  group_by(mileage_category) %>% 
+  summarize(avgPrice = mean(price), sdPrice = sd(price), n = n())
+
+kable(car_twomeans_summary)
+```
+
+```{r, echo=FALSE}
+xbar = car_twomeans_summary$avgPrice[1]
+ybar = car_twomeans_summary$avgPrice[2]
+sx = car_twomeans_summary$sdPrice[1]
+sy = car_twomeans_summary$sdPrice[2]
+nx = car_twomeans_summary$n[1]
+ny = car_twomeans_summary$n[2]
+
+se = sqrt(sx^2/nx + sy^2/ny)
+
+test_stat = ((xbar-ybar) - 0)/se
+
+kable(test_stat)
+```
+
+```{r, echo=FALSE}
+W = (sx^2/nx + sy^2/ny)^2 / (sx^4/(nx^2*(nx-1)) + sy^4/(ny^2*(ny-1))) # Welch approximate degrees of freedom
+
+gt(df = W) +
+  geom_vline(xintercept = test_stat, color = "red")
+```
+
+* **Because we used a one-sided alternative hypothesis ($\mu_x - \mu_y < 0$), we take all of the area on the null distribution to that side of our observed test statistic, no matter where our observed test statistic is.**
+
+* Our alternative hypothesis expected the difference to be negative, and we **got it right**; we observed a value that is negative.
+
+* We take all of the area to the **left** of our observed value, since our alternative hypothesis had $<$.
+
+```{r, echo=FALSE}
+gt(df = W) +
+  geom_t_fill(df = W, b = test_stat)
+```
+
+* The p-value is too small here thus making it unobservable in the graph.
+
+### Step 5: Calculate P-Value
+
+* Here is the calculated p-value: 
+
+```{r, echo=FALSE}
+p = pt(test_stat, df = W)
+
+kable(p)
+
+```
+
+### Step 6: Interpretation
+
+> There is a strong evidence that the true average price for the high mileage car is lower than low mileage car. This is because the p-value we got here is smaller than the significance level 5% thus we are able to reject null hypothesis.
+
+## Part 2 [Price prediction from mileage]
+
+* The question we are trying to answer here is :
+
+> How can we predict car prices based on their mileage? (By doing simple regression)
+
+### Correlation plot
+
+* First, we are going to look at the correlation between price and mileage.
+
+```{r, echo=FALSE}
+cor_plot(car$mileage_km, car$price)
+```
+
+* The seems to be a very weak correlation between mileage and price here. We can see the blue line is almost a horizontal line here.
+
+
+### Estimation of intercept and coefficient
+
+* Next, we are going to estimate a regression line. Below is the estimate for the intercept and the coefficient of beta_1.
+
+
+
+```{r, echo=FALSE}
+model_object = lm(price ~ mileage_km, data = car)
+estimates = coef(model_object)
+beta_hat_0 = estimates[1]
+beta_hat_1 = estimates[2]
+
+kable(tibble(beta_hat_0,beta_hat_1))
+
+```
+
+* The interpretation of the coefficient of Beta_1 here is that for every 1 mile increase in car mileage, the expected price of the car decrease by EUR 0.03.
+
+### Checking the assumptions
+
+* Now lets look at out assumptions.
+
+```{r, echo=FALSE}
+car %>% 
+  add_residuals(model_object) %>% 
+  ggplot(aes(x = mileage_km, y = resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+
+```
+
+> The residual does not show any non-linear patterns here. It looks totally random. Linearity assumption `is not` violated here.
+
+> Normal errors around 0 `might` be vioalated here. This is becase the spread looks a little bit not symmetric here.
+
+> Constant variance `is not` violated here. The residuals shows the same spread for all mileage.
+
+
+### Hypothesis test for beta 1/ coefficient
+
+**We have not yet covered it in class at the moment, will be included in the final report**
+
+# Discussion
+
+## Interpretation
+
+* For question 1(difference in means), we concluded that the mean price of high mileage car is lower than the mean price of the low mileage car. This was proven by hypothesis testing of difference in two means. Therefore, we are able to confirm our suspicion that there are disparities between prices in low mileage cars and high mileage cars.
+
+* For question 2(prediction of car prices), our result might not be valid since it violates the normal errors assumption. Also as you can see from the correlation graph, the amount of information about to predict prices from mileage is not very useful. This is because the strength of correlation between price and mileage here is close to 0 (horizontal). Therefore making it harder to precisely predict car prices just based on mileage.
+
+## Shortcomings
+
+* One shortcoming is that there might be a better way to classified high mileage car and low mileage car. For example, a car that was used for 1 year with 50000km mileage can be considered as high mileage car since the owner used it excessively in just one year period. However, the data does not have information about how many years was it being used.
+
+## Future directions
+
+* One thing that can be done in the future for our project is to construct a prices model controlling for several factors. We feel that this problem is more suitable for multiple linear regression (outside of this course concept)
+
+* Also, instead of taking data just from one car dealership, it is better to aggregate the data from several used car dealership. However, the data might not be standardized and there is a high change of lots of missing data. Data imputation(outside of this course concept) might be useful here.
+
+## Conclusion
+
+* `Question 1:` There is a strong evidence that the price of high mileage car is lower than low mileage car.
+
+* `Question2:` Our model is not the best for predicting prices of used car. This is because we are not able to accurately predict prices just based on the mileage in kilometres.
+
+# Reference
